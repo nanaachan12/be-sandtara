@@ -98,20 +98,16 @@ exports.createEvent = async (request, h) => {
 
     // Create event data object
     const eventData = {
-      name: payload.name,
-      detail: payload.detail,
-      price: Number(payload.price),
-      startDate: new Date(payload.startDate),
-      endDate: new Date(payload.endDate),
-      capacity: Number(payload.capacity),
-      location: {
-        address: payload['location.address'],
-        city: payload['location.city'],
-        province: payload['location.province']
-      },
-      status: payload.status || 'active',
-      images: imagePaths
-    };
+    name: payload.name,
+    detail: payload.detail,
+    location: {
+      address: payload['location.address'],
+      city: payload['location.city'],
+      province: payload['location.province']
+    },
+    images: imagePaths
+  };
+
 
     console.log('Creating event with data:', eventData);
 
@@ -198,20 +194,16 @@ exports.updateEvent = async (request, h) => {
 
     // Create event data object
     const eventData = {
-      name: payload.name || event.name,
-      detail: payload.detail || event.detail,
-      price: payload.price ? Number(payload.price) : event.price,
-      startDate: payload.startDate ? new Date(payload.startDate) : event.startDate,
-      endDate: payload.endDate ? new Date(payload.endDate) : event.endDate,
-      capacity: payload.capacity ? Number(payload.capacity) : event.capacity,
-      status: payload.status || event.status,
-      location: {
-        address: payload['location.address'] || event.location.address,
-        city: payload['location.city'] || event.location.city,
-        province: payload['location.province'] || event.location.province
-      },
-      images: [...remainingImages, ...imagePaths]
-    };
+    name: payload.name || event.name,
+    detail: payload.detail || event.detail,
+    location: {
+      address: payload['location.address'] || event.location.address,
+      city: payload['location.city'] || event.location.city,
+      province: payload['location.province'] || event.location.province
+    },
+    images: [...remainingImages, ...imagePaths]
+  };
+
 
     // Delete removed images from filesystem
     const removedImages = event.images.filter(img => !remainingImages.includes(img));
