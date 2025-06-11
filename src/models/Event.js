@@ -10,20 +10,6 @@ const eventSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  location: {
-    address: {
-      type: String,
-      required: true
-    },
-    city: {
-      type: String,
-      required: true
-    },
-    province: {
-      type: String,
-      required: true
-    }
-  },
   images: [{
     type: String
   }],

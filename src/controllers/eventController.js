@@ -100,11 +100,6 @@ exports.createEvent = async (request, h) => {
     const eventData = {
     name: payload.name,
     detail: payload.detail,
-    location: {
-      address: payload['location.address'],
-      city: payload['location.city'],
-      province: payload['location.province']
-    },
     images: imagePaths
   };
 
@@ -196,11 +191,6 @@ exports.updateEvent = async (request, h) => {
     const eventData = {
     name: payload.name || event.name,
     detail: payload.detail || event.detail,
-    location: {
-      address: payload['location.address'] || event.location.address,
-      city: payload['location.city'] || event.location.city,
-      province: payload['location.province'] || event.location.province
-    },
     images: [...remainingImages, ...imagePaths]
   };
 
