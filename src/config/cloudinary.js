@@ -10,6 +10,17 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'santaratrip',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'gif'],
+    transformation: [{ width: 1000, height: 1000, crop: 'limit' }]
+  }
+});
+
+const upload = multer({ storage: storage });
+
 // Konfigurasi storage untuk foto profil
 const profileStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
@@ -51,6 +62,7 @@ const uploadReview = multer({ storage: reviewStorage });
 
 module.exports = {
   cloudinary,
+  upload,
   uploadProfile,
   uploadTrip,
   uploadReview

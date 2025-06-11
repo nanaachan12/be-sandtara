@@ -1,7 +1,6 @@
 const Boom = require('@hapi/boom');
 const Room = require('../models/Room');
-const fs = require('fs');
-const path = require('path');
+const { cloudinary } = require('../config/cloudinary');
 
 // @desc    Mendapatkan semua kamar
 // @route   GET /api/rooms
@@ -65,34 +64,29 @@ exports.createRoom = async (request, h) => {
     const imagePaths = [];
     if (payload.images) {
       const files = Array.isArray(payload.images) ? payload.images : [payload.images];
-      
-      // Pastikan direktori uploads ada
-      const uploadDir = path.join(__dirname, '../../uploads');
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
 
       for (const file of files) {
         if (file.hapi) {
           try {
-            // Generate nama file yang unik
-            const timestamp = Date.now();
-            const originalName = file.hapi.filename;
-            const safeName = `${timestamp}-${originalName.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-            const filepath = path.join(uploadDir, safeName);
+            // Upload to Cloudinary
+            const result = await new Promise((resolve, reject) => {
+              const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                  folder: 'santaratrip/rooms',
+                },
+                (error, result) => {
+                  if (error) reject(error);
+                  else resolve(result);
+                }
+              );
 
-            // Simpan file
-            const fileStream = fs.createWriteStream(filepath);
-            await new Promise((resolve, reject) => {
-              file.pipe(fileStream);
-              fileStream.on('finish', resolve);
-              fileStream.on('error', reject);
+              file.pipe(uploadStream);
             });
 
-            // Simpan path relatif untuk akses browser
-            imagePaths.push(`/uploads/${safeName}`);
+            // Add Cloudinary URL to images array
+            imagePaths.push(result.secure_url);
           } catch (uploadError) {
-            console.error('Error uploading file:', uploadError);
+            console.error('Error uploading to Cloudinary:', uploadError);
             return Boom.badImplementation('Error saat mengupload gambar');
           }
         }
@@ -171,45 +165,57 @@ exports.updateRoom = async (request, h) => {
     }
 
     // Handle multiple file uploads
+    let newImagePaths = [];
     if (payload.images) {
       const files = Array.isArray(payload.images) ? payload.images : [payload.images];
-      const newImagePaths = [];
-      
-      // Pastikan direktori uploads ada
-      const uploadDir = path.join(__dirname, '../../uploads');
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
 
       for (const file of files) {
         if (file.hapi) {
           try {
-            // Generate nama file yang unik
-            const timestamp = Date.now();
-            const originalName = file.hapi.filename;
-            const safeName = `${timestamp}-${originalName.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-            const filepath = path.join(uploadDir, safeName);
+            // Upload to Cloudinary
+            const result = await new Promise((resolve, reject) => {
+              const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                  folder: 'santaratrip/rooms',
+                },
+                (error, result) => {
+                  if (error) reject(error);
+                  else resolve(result);
+                }
+              );
 
-            // Simpan file
-            const fileStream = fs.createWriteStream(filepath);
-            await new Promise((resolve, reject) => {
-              file.pipe(fileStream);
-              fileStream.on('finish', resolve);
-              fileStream.on('error', reject);
+              file.pipe(uploadStream);
             });
 
-            // Simpan path relatif untuk akses browser
-            newImagePaths.push(`/uploads/${safeName}`);
+            // Add Cloudinary URL to images array
+            newImagePaths.push(result.secure_url);
           } catch (uploadError) {
-            console.error('Error uploading file:', uploadError);
+            console.error('Error uploading to Cloudinary:', uploadError);
             return Boom.badImplementation('Error saat mengupload gambar');
           }
         }
       }
+    }
 
-      // Jika ada gambar baru, tambahkan ke array gambar yang sudah ada
-      if (newImagePaths.length > 0) {
-        room.images = [...(room.images || []), ...newImagePaths];
+    // Handle remaining images
+    let remainingImages = [];
+    if (payload.remainingImages) {
+      try {
+        remainingImages = JSON.parse(payload.remainingImages);
+      } catch (error) {
+        console.error('Error parsing remainingImages:', error);
+      }
+    }
+
+    // Delete removed images from Cloudinary
+    const removedImages = room.images.filter(img => !remainingImages.includes(img));
+    for (const imageUrl of removedImages) {
+      try {
+        // Extract public_id from Cloudinary URL
+        const publicId = imageUrl.split('/').slice(-1)[0].split('.')[0];
+        await cloudinary.uploader.destroy(`santaratrip/rooms/${publicId}`);
+      } catch (error) {
+        console.error('Error deleting image from Cloudinary:', error);
       }
     }
 
@@ -220,38 +226,40 @@ exports.updateRoom = async (request, h) => {
         JSON.parse(payload.amenities) : payload.amenities;
     }
 
-    // Update fields
-    room.name = payload.name || room.name;
-    room.roomNumber = payload.roomNumber || room.roomNumber;
-    room.hotel = payload.hotel || room.hotel;
-    room.type = payload.type || room.type;
-    room.price = payload.price ? parseFloat(payload.price) : room.price;
-    room.capacity = {
-      adults: payload.adults ? parseInt(payload.adults) : room.capacity.adults,
-      children: payload.children ? parseInt(payload.children) : room.capacity.children
-    };
-    room.bedType = payload.bedType || room.bedType;
-    room.size = payload.size ? parseFloat(payload.size) : room.size;
-    room.amenities = amenities;
-    room.description = payload.description || room.description;
-    room.status = payload.status || room.status;
-    room.quantity = {
-      total: payload.totalQuantity ? parseInt(payload.totalQuantity) : room.quantity.total,
-      available: payload.totalQuantity ? parseInt(payload.totalQuantity) : room.quantity.available
-    };
-
-    await room.save();
+    // Update room data
+    const updatedRoom = await Room.findByIdAndUpdate(
+      id,
+      {
+        name: payload.name || room.name,
+        roomNumber: payload.roomNumber || room.roomNumber,
+        hotel: payload.hotel || room.hotel,
+        type: payload.type || room.type,
+        price: payload.price ? parseFloat(payload.price) : room.price,
+        capacity: {
+          adults: payload.adults ? parseInt(payload.adults) : room.capacity.adults,
+          children: payload.children ? parseInt(payload.children) : room.capacity.children
+        },
+        bedType: payload.bedType || room.bedType,
+        size: payload.size ? parseFloat(payload.size) : room.size,
+        amenities: amenities,
+        images: [...remainingImages, ...newImagePaths],
+        description: payload.description || room.description,
+        status: payload.status || room.status,
+        quantity: {
+          total: payload.totalQuantity ? parseInt(payload.totalQuantity) : room.quantity.total,
+          available: payload.totalQuantity ? parseInt(payload.totalQuantity) : room.quantity.available
+        }
+      },
+      { new: true }
+    );
 
     return h.response({
       success: true,
-      message: 'Kamar berhasil diperbarui',
-      data: room
+      message: 'Kamar berhasil diupdate',
+      data: updatedRoom
     });
   } catch (error) {
     console.error('Error updating room:', error);
-    if (error.code === 11000) {
-      return Boom.badRequest('Nomor kamar sudah digunakan');
-    }
     return Boom.badImplementation('Error saat mengupdate kamar');
   }
 };
@@ -270,26 +278,21 @@ exports.deleteRoom = async (request, h) => {
       return Boom.notFound('Kamar tidak ditemukan');
     }
 
-    // Hapus gambar jika ada
+    // Delete images from Cloudinary
     if (room.images && room.images.length > 0) {
-      for (const imagePath of room.images) {
-        if (imagePath !== 'default-room.jpg') {
-          const fullPath = path.join(__dirname, '../..', imagePath);
-          if (fs.existsSync(fullPath)) {
-            try {
-              fs.unlinkSync(fullPath);
-            } catch (err) {
-              console.error('Error deleting image file:', err);
-              // Continue with deletion even if image deletion fails
-            }
-          }
+      for (const imageUrl of room.images) {
+        try {
+          // Extract public_id from Cloudinary URL
+          const publicId = imageUrl.split('/').slice(-1)[0].split('.')[0];
+          await cloudinary.uploader.destroy(`santaratrip/rooms/${publicId}`);
+        } catch (error) {
+          console.error('Error deleting image from Cloudinary:', error);
         }
       }
     }
 
-    // Hapus kamar dari database
     await Room.findByIdAndDelete(id);
-
+    
     return h.response({
       success: true,
       message: 'Kamar berhasil dihapus'

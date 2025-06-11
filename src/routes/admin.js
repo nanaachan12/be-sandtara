@@ -53,14 +53,7 @@ const routes = [
       validate: {
         payload: Joi.object({
           name: Joi.string().required(),
-          detail: Joi.string().required(),
-          price: Joi.number().required(),
-          startDate: Joi.date().iso().required(),
-          endDate: Joi.date().iso().required(),
-          'location.address': Joi.string().required(),
-          'location.city': Joi.string().required(),
-          'location.province': Joi.string().required(),
-          capacity: Joi.number().integer().required(),
+          description: Joi.string().required(),
           status: Joi.string().valid('active', 'inactive').default('active'),
           images: Joi.any().optional()
         })
@@ -89,14 +82,7 @@ const routes = [
         }),
         payload: Joi.object({
           name: Joi.string().optional(),
-          detail: Joi.string().optional(),
-          price: Joi.number().optional(),
-          startDate: Joi.date().iso().optional(),
-          endDate: Joi.date().iso().optional(),
-          'location.address': Joi.string().optional(),
-          'location.city': Joi.string().optional(),
-          'location.province': Joi.string().optional(),
-          capacity: Joi.number().integer().optional(),
+          description: Joi.string().optional(),
           status: Joi.string().valid('active', 'inactive').optional(),
           images: Joi.any().optional(),
           remainingImages: Joi.string().optional()

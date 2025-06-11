@@ -43,34 +43,6 @@ const routes = [
             }
         },
         handler: eventController.getEventById
-    },
-    {
-    method: 'POST',
-    path: '/api/events',
-    options: {
-        payload: {
-        output: 'stream',
-        parse: true,
-        allow: 'multipart/form-data',
-        multipart: true,
-        maxBytes: 1024 * 1024 * 10
-        }
-    },
-    handler: eventController.createEvent
-    },
-    {
-    method: 'PUT',
-    path: '/api/event/{id}',
-    options: {
-        payload: {
-        output: 'stream',
-        parse: true,
-        allow: 'multipart/form-data',
-        multipart: true,
-        maxBytes: 1024 * 1024 * 10
-        }
-    },
-    handler: eventController.updateEvent
     }
 ];
 

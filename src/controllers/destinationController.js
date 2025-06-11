@@ -349,63 +349,75 @@ exports.updateDestination = async (request, h) => {
     console.log('Received payload:', payload);
     
     // Cek apakah destinasi ada
-    const destinationExists = await Destination.findById(id);
-    if (!destinationExists) {
+    const destination = await Destination.findById(id);
+    if (!destination) {
       return Boom.notFound('Destinasi tidak ditemukan');
     }
 
     // Handle multiple file uploads
+    let newImagePaths = [];
     if (payload.gambar) {
       const files = Array.isArray(payload.gambar) ? payload.gambar : [payload.gambar];
-      const newImagePaths = [];
-          
-          // Pastikan direktori uploads ada
-          const uploadDir = path.join(__dirname, '../../uploads');
-          if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-          }
 
       for (const file of files) {
         if (file.hapi) {
           try {
-            // Generate nama file yang unik
-            const timestamp = Date.now();
-            const originalName = file.hapi.filename;
-            const extension = path.extname(originalName);
-            const safeName = `${timestamp}-${originalName.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-            const filepath = path.join(uploadDir, safeName);
-          
-          // Simpan file
-          const fileStream = fs.createWriteStream(filepath);
-          await new Promise((resolve, reject) => {
-            file.pipe(fileStream);
-            fileStream.on('finish', resolve);
-            fileStream.on('error', reject);
-          });
-          
-            // Simpan path relatif untuk akses browser
-            newImagePaths.push(`/uploads/${safeName}`);
+            // Upload to Cloudinary
+            const result = await new Promise((resolve, reject) => {
+              const stream = cloudinary.uploader.upload_stream(
+                {
+                  folder: 'santaratrip/destinations',
+                  transformation: [{ width: 1200, height: 800, crop: 'limit' }]
+                },
+                (error, result) => {
+                  if (error) reject(error);
+                  else resolve(result);
+                }
+              );
+              
+              file.pipe(stream);
+            });
+            
+            // Save Cloudinary URL
+            newImagePaths.push(result.secure_url);
           } catch (uploadError) {
-            console.error('Error uploading file:', uploadError);
+            console.error('Error uploading file to Cloudinary:', uploadError);
             return Boom.badImplementation('Error saat mengupload gambar');
           }
         }
       }
-      
-      // Jika ada gambar baru, tambahkan ke array gambar yang sudah ada
-      if (newImagePaths.length > 0) {
-        destinationExists.gambar = [...(destinationExists.gambar || []), ...newImagePaths];
+    }
+
+    // Handle remaining images
+    let remainingImages = [];
+    if (payload.remainingImages) {
+      try {
+        remainingImages = JSON.parse(payload.remainingImages);
+      } catch (error) {
+        console.error('Error parsing remainingImages:', error);
       }
     }
 
-    // Parse JSON strings jika ada
-    let hariOperasional = destinationExists.hariOperasional;
-    let fasilitas = destinationExists.fasilitas;
+    // Delete removed images from Cloudinary
+    const removedImages = destination.gambar.filter(img => !remainingImages.includes(img));
+    for (const imageUrl of removedImages) {
+      try {
+        // Extract public_id from Cloudinary URL
+        const publicId = imageUrl.split('/').slice(-1)[0].split('.')[0];
+        await cloudinary.uploader.destroy(`santaratrip/destinations/${publicId}`);
+      } catch (error) {
+        console.error('Error deleting image from Cloudinary:', error);
+      }
+    }
+
+    // Parse JSON strings if needed
+    let hariOperasional = destination.hariOperasional;
+    let fasilitas = destination.fasilitas;
 
     try {
       if (payload.hariOperasional) {
         if (typeof payload.hariOperasional === 'string') {
-            hariOperasional = JSON.parse(payload.hariOperasional);
+          hariOperasional = JSON.parse(payload.hariOperasional);
         } else {
           hariOperasional = payload.hariOperasional;
         }
@@ -413,7 +425,7 @@ exports.updateDestination = async (request, h) => {
 
       if (payload.fasilitas) {
         if (typeof payload.fasilitas === 'string') {
-            fasilitas = JSON.parse(payload.fasilitas);
+          fasilitas = JSON.parse(payload.fasilitas);
         } else {
           fasilitas = payload.fasilitas;
         }
@@ -423,50 +435,47 @@ exports.updateDestination = async (request, h) => {
       return Boom.badRequest('Format data tidak valid');
     }
 
-    // Validasi dan parse latitude/longitude jika ada
-    let latitude = destinationExists.latitude;
-    let longitude = destinationExists.longitude;
-
-    if (payload.latitude !== undefined) {
+    // Validate latitude and longitude if provided
+    let latitude = destination.latitude;
+    let longitude = destination.longitude;
+    
+    if (payload.latitude && payload.longitude) {
       latitude = parseFloat(payload.latitude);
-      if (isNaN(latitude) || latitude < -90 || latitude > 90) {
-        return Boom.badRequest('Format latitude tidak valid');
-      }
-    }
-
-    if (payload.longitude !== undefined) {
       longitude = parseFloat(payload.longitude);
-      if (isNaN(longitude) || longitude < -180 || longitude > 180) {
-        return Boom.badRequest('Format longitude tidak valid');
+      
+      if (isNaN(latitude) || isNaN(longitude) || 
+          latitude < -90 || latitude > 90 || 
+          longitude < -180 || longitude > 180) {
+        return Boom.badRequest('Format latitude/longitude tidak valid');
       }
     }
 
-    // Update destinasi
-    const destination = await Destination.findByIdAndUpdate(
+    // Update destination data
+    const updatedDestination = await Destination.findByIdAndUpdate(
       id,
       {
-        nama: payload.nama || destinationExists.nama,
-        kategori: payload.kategori || destinationExists.kategori,
-        harga: payload.harga ? parseInt(payload.harga) : destinationExists.harga,
+        nama: payload.nama || destination.nama,
+        kategori: payload.kategori || destination.kategori,
+        harga: payload.harga ? parseInt(payload.harga) : destination.harga,
         hariOperasional: hariOperasional,
-        alamat: payload.alamat || destinationExists.alamat,
-        kodePos: payload.kodePos || destinationExists.kodePos,
-        deskripsi: payload.deskripsi || destinationExists.deskripsi,
+        alamat: payload.alamat || destination.alamat,
+        kodePos: payload.kodePos || destination.kodePos,
+        deskripsi: payload.deskripsi || destination.deskripsi,
         fasilitas: fasilitas,
-        gambar: destinationExists.gambar,
-        jamBuka: payload.jamBuka || destinationExists.jamBuka,
-        jamTutup: payload.jamTutup || destinationExists.jamTutup,
-        status: payload.status || destinationExists.status,
+        gambar: [...remainingImages, ...newImagePaths],
+        jamBuka: payload.jamBuka || destination.jamBuka,
+        jamTutup: payload.jamTutup || destination.jamTutup,
+        status: payload.status || destination.status,
         latitude: latitude,
         longitude: longitude
       },
       { new: true }
     );
-    
+
     return h.response({
       success: true,
-      message: 'Destinasi berhasil diperbarui',
-      data: destination
+      message: 'Destinasi berhasil diupdate',
+      data: updatedDestination
     });
   } catch (error) {
     console.error('Error updating destination:', error);
@@ -488,24 +497,21 @@ exports.deleteDestination = async (request, h) => {
       return Boom.notFound('Destinasi tidak ditemukan');
     }
 
-    // Hapus gambar jika ada
+    // Delete images from Cloudinary if they exist
     if (destination.gambar && destination.gambar.length > 0) {
-      for (const imagePath of destination.gambar) {
-        const fullPath = path.join(__dirname, '../..', imagePath);
-        if (fs.existsSync(fullPath)) {
-          try {
-            fs.unlinkSync(fullPath);
-          } catch (err) {
-            console.error('Error deleting image file:', err);
-            // Continue with deletion even if image deletion fails
-          }
+      for (const imageUrl of destination.gambar) {
+        try {
+          // Extract public_id from Cloudinary URL
+          const publicId = imageUrl.split('/').slice(-1)[0].split('.')[0];
+          await cloudinary.uploader.destroy(`santaratrip/destinations/${publicId}`);
+        } catch (error) {
+          console.error('Error deleting image from Cloudinary:', error);
         }
       }
     }
 
-    // Hapus destinasi dari database
     await Destination.findByIdAndDelete(id);
-
+    
     return h.response({
       success: true,
       message: 'Destinasi berhasil dihapus'

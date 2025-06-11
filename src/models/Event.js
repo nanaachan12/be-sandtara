@@ -6,13 +6,18 @@ const eventSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  detail: {
+  description: {
     type: String,
     required: true
   },
   images: [{
     type: String
   }],
+  status: {
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active'
+  }
 }, {
   timestamps: true
 });
