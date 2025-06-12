@@ -9,7 +9,7 @@ const init = async () => {
         host: process.env.HOST || '0.0.0.0',
         routes: {
             cors: {
-                origin: ['http://localhost:5173', 'http://localhost:3000'],
+                origin: ['http://localhost:5173', 'https://sandtara-trip.vercel.app/', 'http://localhost:3000'],
                 headers: [
                     'Accept',
                     'Authorization',
