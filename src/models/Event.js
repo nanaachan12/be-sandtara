@@ -15,8 +15,8 @@ const eventSchema = new mongoose.Schema({
   }],
   status: {
     type: String,
-    enum: ['active', 'inactive'],
-    default: 'active'
+    enum: ['Kuliner Khas Denpasar', 'Toko Oleh-oleh'],
+    default: 'Kuliner Khas Denpasar'
   }
 }, {
   timestamps: true
