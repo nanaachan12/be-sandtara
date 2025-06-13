@@ -54,7 +54,7 @@ const routes = [
         payload: Joi.object({
           name: Joi.string().required(),
           description: Joi.string().required(),
-          status: Joi.string().valid('active', 'inactive').default('active'),
+          category: Joi.string().valid('kuliner khas denpasar', 'toko oleh-oleh').optional(), // Optional category
           images: Joi.any().optional()
         })
       }
@@ -83,7 +83,7 @@ const routes = [
         payload: Joi.object({
           name: Joi.string().optional(),
           description: Joi.string().optional(),
-          status: Joi.string().valid('active', 'inactive').optional(),
+          category: Joi.string().valid('kuliner khas denpasar', 'toko oleh-oleh').optional(), // Optional category
           images: Joi.any().optional(),
           remainingImages: Joi.string().optional()
         })
@@ -108,7 +108,7 @@ const routes = [
     handler: eventController.deleteEvent
   },
   
-  // Tambah destinasi
+// Tambah destinasi
   {
     method: 'POST',
     path: '/admin/destinasi',

@@ -5,7 +5,7 @@ const { cloudinary } = require('../config/cloudinary');
 exports.getAllEvents = async (request, h) => {
   try {
     console.log('Fetching all events');
-    const events = await Event.find({ status: 'active' });
+    const events = await Event.find({}); // Remove status filter since category is optional
     console.log(`Found ${events.length} events`);
     
     return h.response({
@@ -53,7 +53,7 @@ exports.getEventById = async (request, h) => {
 exports.createEvent = async (request, h) => {
   try {
     const payload = request.payload;
-    console.log('Received payload:', payload);
+    console.log('Receiving payload:', payload);
 
     // Handle image uploads
     const imagePaths = [];
@@ -93,7 +93,7 @@ exports.createEvent = async (request, h) => {
       name: payload.name,
       description: payload.description,
       images: imagePaths,
-      status: payload.status || 'active'
+      category: payload.category // Optional, will be undefined if not provided
     };
 
     console.log('Creating event with data:', eventData);
@@ -118,7 +118,7 @@ exports.createEvent = async (request, h) => {
 exports.updateEvent = async (request, h) => {
   try {
     const payload = request.payload;
-    console.log('Received payload:', payload);
+    console.log('Receiving payload:', payload);
 
     // Check if event exists
     const event = await Event.findById(request.params.id);
@@ -180,7 +180,7 @@ exports.updateEvent = async (request, h) => {
       name: payload.name || event.name,
       description: payload.description || event.description,
       images: allImages.length > 0 ? allImages : event.images,
-      status: payload.status || event.status
+      category: payload.category !== undefined ? payload.category : event.category // Preserve existing category if not provided
     };
 
     // Update the event
@@ -240,4 +240,4 @@ exports.deleteEvent = async (request, h) => {
       message: error.message
     }).code(400);
   }
-}; 
+};
